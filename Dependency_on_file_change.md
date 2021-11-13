@@ -47,31 +47,39 @@ add_custom_target(
 
 ```cmake
 # TLTR:
-# If there is no test config in tests/config/ they will be generated out of the corresponding config_template.json
-# If any config_template.json has been changed -> test configs will be regenerated
+# If there is no test config in tests/config/ they will be generated out of the corresponding config_template.hjson
+# If any config_template.hjson has been changed -> test configs will be regenerated
 
 # Collect all config template files to set dependence for config generation command
 FILE(GLOB_RECURSE config_templates
-    ${CMAKE_SOURCE_DIR}/tests/configs/*_template.json
+    CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/configs/*_template.hjson
 )
-# Collect generated configs. If there is no configs - they will be generated
-FILE(GLOB generated_config_dirs
-    LIST_DIRECTORIES true
-    ${CMAKE_SOURCE_DIR}/tests/configs/*
-)
+
+SET(config_directories "")
+FOREACH(tmpl ${config_templates})
+    get_filename_component(dir ${tmpl} DIRECTORY)
+    LIST(APPEND config_directories ${dir})
+ENDFOREACH()
+
 SET(generated_configs "")
-FOREACH(dir ${generated_config_dirs})
+FOREACH(dir ${config_directories})
     LIST(APPEND generated_configs ${dir}/config.json)
 ENDFOREACH()
 
 # Generate configs out of template files (to have properly generated "source" entity)
 add_custom_command(
     OUTPUT ${generated_configs}
-    # find all subdirs in tests/configs, than run "generate_config_files.py -i <DIR_FDROM_FIND> to generate configs
-    COMMAND find ${CMAKE_SOURCE_DIR}/tests/configs -maxdepth 2 -mindepth 1 -type d -exec python3 ${CMAKE_SOURCE_DIR}/utils/generate_config_files.py -p -i '{}' '\;'
     COMMENT "Generating test configs"
     DEPENDS ${config_templates} # configs will be regenerated if template has changed
 )
+FOREACH(dir ${config_directories})
+    add_custom_command(
+        OUTPUT ${generated_configs}
+        APPEND COMMAND python3 ${CMAKE_SOURCE_DIR}/tests/generate_config_files.py -p -l -i ${dir}
+    )
+ENDFOREACH()
+
 add_custom_target(
     generate_test_config
     DEPENDS ${generated_configs}
